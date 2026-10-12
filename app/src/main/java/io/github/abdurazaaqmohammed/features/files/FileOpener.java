@@ -73,6 +73,7 @@ import io.github.abdurazaaqmohammed.adapters.main.FileOperationsHelper;
 import io.github.abdurazaaqmohammed.domain.files.ZipEntryInfo;
 import io.github.abdurazaaqmohammed.arsc.ArscEditorPlusActivity;
 import io.github.abdurazaaqmohammed.arsc.ArscEditorActivity;
+import io.github.abdurazaaqmohammed.features.axml.AxmlEditorActivity;
 import io.github.abdurazaaqmohammed.ui.activities.HexEditorActivity;
 import io.github.abdurazaaqmohammed.ui.activities.TextEditorActivity;
 import io.github.abdurazaaqmohammed.utils.AccessManager;
@@ -206,7 +207,7 @@ public class FileOpener {
         if (lower.endsWith(".xml")) {
             actionNames.add(context.getString(R.string.xml_functions));
             actionIcons.add(R.drawable.code_24px);
-            actionHandlers.add(() -> showXmlFunctions(file, fileName));
+            actionHandlers.add(() -> showXmlFunctions(file, fileName, zipFile, zipEntryPath));
         }
         String keyExt = FilenameUtils.getExtension(fileName).toLowerCase(Locale.ROOT);
         if (keyExt.equals("jks") || keyExt.equals("keystore") || keyExt.equals("p12")
@@ -495,6 +496,10 @@ public class FileOpener {
     }
 
     private void showXmlFunctions(File file, String fileName) {
+        showXmlFunctions(file, fileName, null, null);
+    }
+
+    private void showXmlFunctions(File file, String fileName, File zipFile, String zipEntryPath) {
         withReadableCopy(file, readable -> {
             boolean binary = false;
             try (InputStream is = FileUtils.getInputStream(readable)) {
@@ -502,7 +507,7 @@ public class FileOpener {
             } catch (Exception ignored) {
             }
             String[] items = binary
-                    ? new String[]{context.getString(R.string.open_as_text), context.getString(R.string.decode_open)}
+                    ? new String[]{context.getString(R.string.open_as_text), context.getString(R.string.decode_open), context.getString(R.string.axml_edit_tree)}
                     : new String[]{context.getString(R.string.open_as_text), context.getString(R.string.format_xml)};
             final boolean isBinary = binary;
             dialogUtil.styleAlertDialog(dialogUtil.getDialogBuilder()
@@ -512,6 +517,8 @@ public class FileOpener {
                         if (which == 0) {
                             context.startActivity(rootAwareEditorIntent(readable, file)
                                     .putExtra("path", readable.getPath()));
+                        } else if (isBinary && which == 2) {
+                            openAxmlTreeEditor(readable, file, fileName, zipFile, zipEntryPath);
                         } else if (isBinary) {
                             try (InputStream is2 = FileUtils.getInputStream(readable)) {
                                 context.startActivity(rootAwareEditorIntent(readable, file)
@@ -526,6 +533,26 @@ public class FileOpener {
                         }
                     }).create());
         });
+    }
+
+    /**
+     * Opens a binary (compiled) XML file in the AXML tree editor. When the file was
+     * staged out of an archive, the archive coordinates are forwarded so the edited
+     * file can be written back (same 757 result contract as the text editor). When it
+     * was staged via root, the original path is forwarded for su write-back.
+     */
+    private void openAxmlTreeEditor(File readable, File original, String fileName,
+                                    File zipFile, String zipEntryPath) {
+        Intent i = new Intent(context, AxmlEditorActivity.class);
+        i.putExtra("path", readable.getPath());
+        i.putExtra("fileName", fileName);
+        if (zipFile != null) i.putExtra("zf", zipFile.getPath());
+        if (zipEntryPath != null && !zipEntryPath.isEmpty()) i.putExtra("zipEntryPath", zipEntryPath);
+        if (zipFile == null && original != null
+                && !readable.getAbsolutePath().equals(original.getAbsolutePath())) {
+            i.putExtra("rootOriginalPath", original.getAbsolutePath());
+        }
+        context.startActivityForResult(i, 757);
     }
 
     private void formatXmlFile(File readable, File original, String fileName) {

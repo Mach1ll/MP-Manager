@@ -158,6 +158,12 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:windowSoftInputMode="adjustResize|stateHidden" />
         <activity
+            android:name="io.github.abdurazaaqmohammed.features.axml.AxmlEditorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <activity
             android:name="io.github.abdurazaaqmohammed.arsc.ArscEditorActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"

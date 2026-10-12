@@ -1070,6 +1070,14 @@ Layout Inspector
     <string name="img_standard_crop">Standard crop</string>
     <string name="dex_replace_strings">Replace strings</string>
     <string name="dex_merge">Merge dex files</string>
+    <string name="dex_redivision">Redivide dex</string>
+    <string name="dex_anti_confusion">Dex anti-confusion</string>
+    <string name="dex_decrypt_strings">Decrypt dex strings</string>
+    <string name="dex_redivided_to">Redivided into %1$d dex files</string>
+    <string name="dex_deconfused_n">Renamed %1$d confusing classes</string>
+    <string name="dex_no_confusing_names">No confusing class names found</string>
+    <string name="dex_strings_decrypted_n">Decrypted %1$d strings</string>
+    <string name="dex_no_encrypted_strings">No encrypted strings found</string>
     <string name="arsc_plus">ARSC Editor Plus</string>
     <string name="arsc_editor">ARSC Editor</string>
     <string name="me_updated"> updated</string>

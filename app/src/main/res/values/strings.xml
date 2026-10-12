@@ -1377,6 +1377,10 @@ Layout Inspector
     <string name="export_strings">Export strings</string>
     <string name="export_for_translation">Export for translation</string>
     <string name="no_apk_for_translation">Translation export needs an APK; open the file from inside an APK</string>
+    <string name="import_translation">Import translation</string>
+    <string name="select_translation_file">Select translation file (.json / .mtd)</string>
+    <string name="invalid_locale">Invalid locale (e.g. vi, en-rUS)</string>
+    <string name="imported_translation_n">Imported %1$d strings into %2$s (%3$d skipped)</string>
     <string name="cannot_create_directory">Cannot create output directory</string>
     <string name="x_strings_found">%1$d strings found</string>
     <string name="x_more_strings">… and %1$d more</string>

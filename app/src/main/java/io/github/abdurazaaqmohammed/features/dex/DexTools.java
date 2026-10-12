@@ -2,6 +2,7 @@ package io.github.abdurazaaqmohammed.features.dex;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.widget.Button;
@@ -10,11 +11,13 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.preference.PreferenceManager;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.model.FileHeader;
+import net.lingala.zip4j.model.ZipParameters;
 
 import com.android.tools.smali.baksmali.Baksmali;
 import com.android.tools.smali.baksmali.BaksmaliOptions;
@@ -42,6 +45,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
+import io.github.abdurazaaqmohammed.features.dex.tools.DexAntiConfusion;
+import io.github.abdurazaaqmohammed.features.dex.tools.DexRedivision;
+import io.github.abdurazaaqmohammed.features.dex.tools.DexStringDecrypt;
 import io.github.abdurazaaqmohammed.MPManager.MainActivity;
 import io.github.abdurazaaqmohammed.MPManager.R;
 import io.github.abdurazaaqmohammed.domain.files.ZipEntryInfo;
@@ -53,7 +59,9 @@ import io.github.abdurazaaqmohammed.utils.DexStringUtil;
 import io.github.abdurazaaqmohammed.utils.DialogUtil;
 import io.github.abdurazaaqmohammed.utils.ErrorUtil;
 import io.github.abdurazaaqmohammed.utils.FileUtils;
+import io.github.abdurazaaqmohammed.utils.MergeUtil;
 import io.github.abdurazaaqmohammed.utils.ProgressManager;
+import io.github.abdurazaaqmohammed.utils.SignWrapper;
 import io.github.codehasan.colorpicker.extensions.Extensions;
 import modder.hub.dexeditor.activity.DexEditorActivity;
 
@@ -125,7 +133,10 @@ public class DexTools {
                 context.rss.getString(R.string.dex_to_smali),
                 context.rss.getString(R.string.translation_mode),
                 context.rss.getString(R.string.dex_replace_strings),
-                context.rss.getString(R.string.dex_merge)};
+                context.rss.getString(R.string.dex_merge),
+                context.rss.getString(R.string.dex_redivision),
+                context.rss.getString(R.string.dex_anti_confusion),
+                context.rss.getString(R.string.dex_decrypt_strings)};
         dialogUtil.styleAlertDialog(dialogUtil.getDialogBuilder()
                 .setTitle(displayName)
                 .setSingleChoiceItems(options, -1, (dialog, which) -> {
@@ -140,6 +151,12 @@ public class DexTools {
                         showDexStringReplaceDialog(dexFile, zipFile);
                     } else if (which == 6) {
                         mergeDexOption(dexFile, zipFile);
+                    } else if (which == 7) {
+                        redivideDex(dexFile, zipFile);
+                    } else if (which == 8) {
+                        antiConfusionDex(dexFile, zipFile);
+                    } else if (which == 9) {
+                        decryptDexStrings(dexFile, zipFile);
                     } else if (which == 0 && zipFile != null) {
                         openDexPlusInZip(zipFile, dexFile.getName());
                     } else {
@@ -681,6 +698,173 @@ public class DexTools {
                     context.handler.post(() -> {
                         Extensions.showMessage(context, context.rss.getString(R.string.fo_merged_n, inputs.size()));
                         context.loadFolderInPane(dir, pane1);
+                    });
+                }
+            } catch (Exception e) {
+                pm.dismiss();
+                new ErrorUtil(context).showError(e);
+            }
+        }).start();
+    }
+
+    private interface DexFileTool {
+        int run(File inDex, File outDex) throws Exception;
+    }
+
+    /**
+     * Runs a single-output dex tool (anti-confusion, string decryption).
+     * Standalone: backs up and overwrites the dex. In a zip: stages the result and
+     * reuses the standard "add back to archive" flow.
+     */
+    private void runDexFileTool(File dexFile, File zipFile, DexFileTool tool,
+                                int nothingFoundMsg,
+                                java.util.function.Function<Integer, String> doneMessage) {
+        ProgressManager pm = new ProgressManager(context, true);
+        pm.show();
+        new Thread(() -> {
+            try {
+                File tmpOut = new File(context.getCacheDir(), "dextool" + UUID.randomUUID() + ".dex");
+                int count = tool.run(dexFile, tmpOut);
+                if (count == 0) {
+                    //noinspection ResultOfMethodCallIgnored
+                    tmpOut.delete();
+                    pm.dismiss();
+                    context.handler.post(() -> Extensions.showMessage(context,
+                            context.rss.getString(nothingFoundMsg)));
+                    return;
+                }
+                if (zipFile != null) {
+                    FileUtils.copyFile(tmpOut, dexFile);
+                    //noinspection ResultOfMethodCallIgnored
+                    tmpOut.delete();
+                    pm.dismiss();
+                    context.handler.post(() -> {
+                        Extensions.showMessage(context, doneMessage.apply(count));
+                        context.handleModifiedFileResult(Uri.fromFile(dexFile));
+                    });
+                } else {
+                    File bak = new File(dexFile.getParent(), dexFile.getName() + ".bak");
+                    if (!bak.exists()) FileUtils.copyFile(dexFile, bak);
+                    FileUtils.copyFile(tmpOut, dexFile);
+                    //noinspection ResultOfMethodCallIgnored
+                    tmpOut.delete();
+                    pm.dismiss();
+                    context.handler.post(() -> {
+                        Extensions.showMessage(context, doneMessage.apply(count));
+                        context.loadFolderInPane(dexFile.getParentFile(), pane1);
+                    });
+                }
+            } catch (Exception e) {
+                pm.dismiss();
+                new ErrorUtil(context).showError(e);
+            }
+        }).start();
+    }
+
+    private void antiConfusionDex(File dexFile, File zipFile) {
+        runDexFileTool(dexFile, zipFile,
+                DexAntiConfusion::deconfuse,
+                R.string.dex_no_confusing_names,
+                n -> context.rss.getString(R.string.dex_deconfused_n, n));
+    }
+
+    private void decryptDexStrings(File dexFile, File zipFile) {
+        runDexFileTool(dexFile, zipFile,
+                DexStringDecrypt::decryptStrings,
+                R.string.dex_no_encrypted_strings,
+                n -> context.rss.getString(R.string.dex_strings_decrypted_n, n));
+    }
+
+    /**
+     * Splits the dex classes across several dex files so each stays below the
+     * 64K method-reference limit. In a zip, every classes*.dex entry is replaced
+     * by the redivided outputs.
+     */
+    private void redivideDex(File dexFile, File zipFile) {
+        ProgressManager pm = new ProgressManager(context, true);
+        pm.show();
+        new Thread(() -> {
+            try {
+                File tmpDir = new File(context.getCacheDir(), "dexrediv" + UUID.randomUUID());
+                tmpDir.mkdirs();
+                List<File> inputs = new ArrayList<>();
+                List<String> oldEntries = new ArrayList<>();
+                if (zipFile != null) {
+                    try (ZipFile zf = new ZipFile(zipFile)) {
+                        for (FileHeader fh : zf.getFileHeaders()) {
+                            String n = fh.getFileName();
+                            if (n != null && n.matches("classes(\\d*)\\.dex")) oldEntries.add(n);
+                        }
+                    }
+                    Collections.sort(oldEntries,
+                            (a, b) -> Integer.compare(dexNameNumber(a), dexNameNumber(b)));
+                    try (ZipFile zf = new ZipFile(zipFile)) {
+                        for (String n : oldEntries) {
+                            File out0 = new File(tmpDir, n.replace('/', '_'));
+                            try (InputStream is = zf.getInputStream(zf.getFileHeader(n))) {
+                                FileUtils.copyFile(is, out0);
+                            }
+                            inputs.add(out0);
+                        }
+                    }
+                    if (inputs.isEmpty()) {
+                        pm.dismiss();
+                        context.handler.post(() -> Extensions.showMessage(context,
+                                context.rss.getString(R.string.fo_need_dex)));
+                        return;
+                    }
+                } else {
+                    inputs.add(dexFile);
+                }
+                File outDir = new File(tmpDir, "out");
+                List<File> outputs = DexRedivision.redivide(inputs, outDir,
+                        DexRedivision.DEFAULT_MAX_METHOD_REFS);
+                if (zipFile != null) {
+                    File bak = new File(zipFile.getParent(), zipFile.getName() + ".bak");
+                    if (!bak.exists()) FileUtils.copyFile(zipFile, bak);
+                    try (ZipFile zf = new ZipFile(zipFile)) {
+                        for (String n : oldEntries) zf.removeFile(n);
+                        for (File part : outputs) {
+                            ZipParameters zp = MergeUtil.newPreferredZipParameters(context);
+                            zp.setFileNameInZip(part.getName());
+                            try (InputStream is = new FileInputStream(part)) {
+                                zf.addStream(is, zp);
+                            }
+                        }
+                    }
+                    pm.dismiss();
+                    SharedPreferences settings =
+                            PreferenceManager.getDefaultSharedPreferences(context);
+                    boolean autosign = settings.getBoolean("autosign", true)
+                            && zipFile.getName().toLowerCase(Locale.US).endsWith(".apk");
+                    String done = context.rss.getString(R.string.dex_redivided_to, outputs.size());
+                    context.handler.post(() -> {
+                        Extensions.showMessage(context, done);
+                        if (autosign) {
+                            SignWrapper.requireAuth(context, sw -> new Thread(() -> {
+                                try {
+                                    sw.signApk(zipFile);
+                                } catch (Exception e) {
+                                    new ErrorUtil(context).showError(e);
+                                }
+                                context.handler.post(() -> context.loadZipFolderInPane(
+                                        zipFile, "", pane1, true));
+                            }).start());
+                        } else {
+                            context.loadZipFolderInPane(zipFile, "", pane1, true);
+                        }
+                    });
+                } else {
+                    File bak = new File(dexFile.getParent(), dexFile.getName() + ".bak");
+                    if (!bak.exists()) FileUtils.copyFile(dexFile, bak);
+                    for (File part : outputs) {
+                        FileUtils.copyFile(part, new File(dexFile.getParentFile(), part.getName()));
+                    }
+                    pm.dismiss();
+                    context.handler.post(() -> {
+                        Extensions.showMessage(context, context.rss.getString(
+                                R.string.dex_redivided_to, outputs.size()));
+                        context.loadFolderInPane(dexFile.getParentFile(), pane1);
                     });
                 }
             } catch (Exception e) {

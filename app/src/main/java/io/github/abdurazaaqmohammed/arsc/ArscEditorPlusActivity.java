@@ -68,6 +68,8 @@ import java.util.regex.Pattern;
 
 import io.github.abdurazaaqmohammed.MPManager.R;
 import io.github.abdurazaaqmohammed.features.translation.TranslationExportDialog;
+import io.github.abdurazaaqmohammed.features.translation.TranslationImportDialog;
+import io.github.abdurazaaqmohammed.features.translation.TranslationImporter;
 import io.github.abdurazaaqmohammed.ui.UiFields;
 import io.github.abdurazaaqmohammed.ui.dialogs.FilePickerDialog;
 import io.github.abdurazaaqmohammed.utils.ErrorUtil;
@@ -121,6 +123,7 @@ public class ArscEditorPlusActivity extends BaseActivity {
     private TextView batchLabel;
     /** Registered once in buildShell(); building it on a click would hit the STARTED-state rule. */
     private TranslationExportDialog translationExportDialog;
+    private TranslationImportDialog translationImportDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -781,6 +784,9 @@ public class ArscEditorPlusActivity extends BaseActivity {
             } else if (itemId == R.id.action_export_translation) {
                 exportForTranslation();
                 return true;
+            } else if (itemId == R.id.action_import_translation) {
+                importTranslation();
+                return true;
             } else if (itemId == R.id.action_import_strings) {
                 importStrings();
                 return true;
@@ -1242,6 +1248,44 @@ public class ArscEditorPlusActivity extends BaseActivity {
         }
         if (translationExportDialog == null) translationExportDialog = new TranslationExportDialog(this);
         translationExportDialog.showPreviewDialog(data.apkFile);
+    }
+
+    /**
+     * Imports a translated strings file (.json / .mtd) back into the arsc as a
+     * new locale, closing the export - translate - import loop.
+     */
+    private void importTranslation() {
+        if (data == null) return;
+        if (translationImportDialog == null) translationImportDialog = new TranslationImportDialog(this);
+        translationImportDialog.show((file, locale) -> {
+            Extensions.showMessage(this, R.string.importing);
+            new Thread(() -> {
+                try {
+                    java.util.List<TranslationImporter.Translation> translations =
+                            TranslationImporter.parse(file);
+                    TranslationImporter.ImportResult result =
+                            TranslationImporter.importTranslations(data.table, translations, locale);
+                    if (result.imported > 0) {
+                        data.save();
+                        data.pushHistory("Import translation (" + locale + ", "
+                                + result.imported + ")", null);
+                    }
+                    runOnUiThread(() -> {
+                        if (result.imported > 0) {
+                            markDirty();
+                            rebuildTree();
+                            refreshStrings();
+                            historyAdapter.refresh();
+                        }
+                        Extensions.showMessage(this, getString(
+                                R.string.imported_translation_n,
+                                result.imported, locale, result.skipped));
+                    });
+                } catch (Exception e) {
+                    runOnUiThread(() -> new ErrorUtil(this).showError(e));
+                }
+            }).start();
+        });
     }
 
     private void importStrings() {

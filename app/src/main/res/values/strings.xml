@@ -1385,6 +1385,7 @@ Layout Inspector
     <string name="x_strings_found">%1$d strings found</string>
     <string name="x_more_strings">… and %1$d more</string>
     <string name="import_strings">Import strings</string>
+    <string name="run_script">Run script</string>
     <string name="imports">Import</string>
     <string name="batch_remove">Batch remove</string>
     <string name="open_in_text_editor">Open in text editor</string>

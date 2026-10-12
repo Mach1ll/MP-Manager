@@ -209,6 +209,11 @@ public class FileOpener {
             actionIcons.add(R.drawable.code_24px);
             actionHandlers.add(() -> showXmlFunctions(file, fileName, zipFile, zipEntryPath));
         }
+        if (lower.endsWith(".js")) {
+            actionNames.add(context.getString(R.string.run_script));
+            actionIcons.add(R.drawable.code_24px);
+            actionHandlers.add(() -> runScript(file));
+        }
         String keyExt = FilenameUtils.getExtension(fileName).toLowerCase(Locale.ROOT);
         if (keyExt.equals("jks") || keyExt.equals("keystore") || keyExt.equals("p12")
                 || keyExt.equals("pfx") || keyExt.equals("pk8") || keyExt.equals("pem")) {
@@ -497,6 +502,15 @@ public class FileOpener {
 
     private void showXmlFunctions(File file, String fileName) {
         showXmlFunctions(file, fileName, null, null);
+    }
+
+    /** Launches the script runner for a .js file. */
+    private void runScript(File file) {
+        Intent intent = new Intent(context,
+                io.github.abdurazaaqmohammed.features.script.ScriptRunnerActivity.class);
+        intent.putExtra(io.github.abdurazaaqmohammed.features.script.ScriptRunnerActivity.EXTRA_SCRIPT_PATH,
+                file.getAbsolutePath());
+        context.startActivity(intent);
     }
 
     private void showXmlFunctions(File file, String fileName, File zipFile, String zipEntryPath) {
